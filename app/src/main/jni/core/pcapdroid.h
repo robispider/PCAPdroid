@@ -29,6 +29,9 @@
 #include "common/jni_utils.h"
 #include "common/uid_resolver.h"
 #include "third_party/uthash.h"
+//hct
+#include <stdbool.h>
+#include <pthread.h>
 
 #define CAPTURE_STATS_UPDATE_FREQUENCY_MS 300
 #define CONNECTION_DUMP_UPDATE_FREQUENCY_MS 1000
@@ -119,6 +122,12 @@ typedef struct {
     bool has_payload[2]; // [0]: rx, [1] tx
     char *url;
     uint8_t update_type;
+    //hct
+   // bool is_conn_blocked;
+    bool is_conn_paused;
+
+    pthread_mutex_t *mutex; // Change the type to a pointer to pthread_mutex_t
+    UT_hash_handle hh; // Required for uthash integration
 } pd_conn_t;
 
 typedef struct {
@@ -172,6 +181,7 @@ typedef struct pcapdroid {
     jobject capture_service;
     jint sdk_ver;
 #endif
+
     int new_conn_id;
     uint64_t now_ms;            // Monotonic timestamp, see pd_refresh_time
     struct ndpi_detection_module_struct *ndpi;
@@ -192,6 +202,8 @@ typedef struct pcapdroid {
     bool vpn_capture;
     bool pcap_file_capture;
     payload_mode_t payload_mode;
+    //hct
+    float max_payload_length;
 
     // stats
     u_int num_dropped_pkts;
@@ -297,6 +309,8 @@ typedef struct {
 #ifdef ANDROID
 
 typedef struct {
+    jmethodID isConnectionBlockExist;//hct
+    jmethodID jnotifyPausedConnection;//hct
     jmethodID reportError;
     jmethodID getApplicationByUid;
     jmethodID protect;
@@ -335,6 +349,7 @@ typedef struct {
     jclass list;
     jclass arraylist;
     jclass payload_chunk;
+    jclass capture_service;
 } jni_classes_t;
 
 typedef struct {
@@ -385,7 +400,13 @@ void pd_purge_connection(pcapdroid_t *pd, pd_conn_t *data);
 int pd_notify_connection_update(pcapdroid_t *pd, const zdtun_5tuple_t *tuple, pd_conn_t *data);
 void pd_giveup_dpi(pcapdroid_t *pd, pd_conn_t *data, const zdtun_5tuple_t *tuple);
 const char* pd_get_proto_name(pcapdroid_t *pd, uint16_t proto, uint16_t alpn, int ipproto);
-
+//hct
+void pause_a_conn(int id);
+void resume_a_conn(int id);
+bool is_conn_paused(int id);
+void removeConnection(int connectionId);
+pd_conn_t* findConnection(int connectionId);
+void block_a_connection(int key);
 // Utility
 const char* get_cache_path(pcapdroid_t *pd, const char *subpath);
 const char* get_file_path(pcapdroid_t *pd, const char *subpath);
@@ -402,7 +423,7 @@ zdtun_ip_t getIPPref(JNIEnv *env, jobject vpn_inst, const char *key, int *ip_ver
 uint32_t getIPv4Pref(JNIEnv *env, jobject vpn_inst, const char *key);
 struct in6_addr getIPv6Pref(JNIEnv *env, jobject vpn_inst, const char *key);
 void getApplicationByUid(pcapdroid_t *pd, jint uid, char *buf, int bufsize);
-
+float getFloatPref(JNIEnv *env, jobject vpn_inst, const char *key);
 #endif // ANDROID
 
 // Internals

@@ -1,5 +1,5 @@
 <resources>
-    <string name="pcapdroid_app_name" translatable="false">PCAPdroid</string>
+    <string name="pcapdroid_app_name" translatable="false">LeakDefender</string>
     <string name="default_collector_ip" translatable="false">127.0.0.1</string>
     <string name="default_collector_port" translatable="false">1234</string>
     <string name="ip_and_port" translatable="false">%1$s:%2$d</string>
@@ -11,11 +11,12 @@
     <string name="installation_id" translatable="false">Installation ID</string>
     <string name="license_code" translatable="false">License code</string>
     <string name="root" translatable="false">root</string>
-    <string name="app_license" translatable="false">PCAPdroid is distributed in the hope that it will be useful, but WITHOUT
+    <string name="app_license" translatable="false">LeakDefender is distributed in the hope that it will be useful, but WITHOUT
         ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
         See the <a href='https://www.gnu.org/licenses/gpl-3.0-standalone.html'>GNU General Public License or later</a> for
         more details</string>
     <string name="opensource_licenses" translatable="false"><b>Open Source Licenses:</b><br />\n\n
+        - PCAPDroid <a href="https://github.com/emanuele-f/PCAPdroid"></a>
         - zdtun: <a href='https://github.com/emanuele-f/zdtun/blob/master/COPYING'>LGPL-3.0</a>\n\n
         - nDPI: <a href='https://github.com/ntop/nDPI/blob/dev/COPYING'>LGPL-3.0</a>\n\n
         - CustomActivityOnCrash: <a href='https://github.com/Ereza/CustomActivityOnCrash/blob/master/LICENSE'>Apache-2.0</a>\n\n
@@ -107,7 +108,9 @@
     <string name="copy_to_clipboard">Copy</string>
     <string name="save_to_file">Save to file</string>
     <string name="older_connections_notice">%1$d older connections not shown</string>
-    <string name="about_text">PCAPdroid is an open source network capture and monitoring tool which works without root privileges</string>
+    <string name="about_text">
+        LeakDefender is student project of HCT. This project is a Fork of Opensouruce project PCAPDriod. PCAPdroid is an open source network capture and monitoring tool which works without root privileges</string>
+
     <string name="get_app">Get it:</string>
     <string name="unknown_app">Unknown</string>
     <string name="phone_app">Phone</string>
@@ -133,7 +136,7 @@
     <string name="proxy_host">Proxy host</string>
     <string name="proxy_port">Proxy port</string>
     <string name="root_capture">Capture as root</string>
-    <string name="root_capture_summary">Allows PCAPdroid to run with other VPN apps</string>
+    <string name="root_capture_summary">Allows LeakDefender to run with other VPN apps</string>
     <string name="donate">Donate</string>
     <string name="app_log">Log</string>
     <string name="no_data">No data</string>
@@ -169,9 +172,9 @@
     <string name="ctrl_consent">An app wants to capture your device traffic.\nDeny it if you are not sure</string>
     <string name="deny">Deny</string>
     <string name="allow">Allow</string>
-    <string name="ctrl_consent_title">PCAPdroid control request</string>
-    <string name="ctrl_consent_denied">PCAPdroid: the control request was denied</string>
-    <string name="ctrl_consent_allowed">PCAPdroid: the control request was allowed</string>
+    <string name="ctrl_consent_title">LeakDefender control request</string>
+    <string name="ctrl_consent_denied">LeakDefender: the control request was denied</string>
+    <string name="ctrl_consent_allowed">LeakDefender: the control request was allowed</string>
     <string name="capture_interface">Capture interface</string>
     <string name="internet">Internet</string>
     <string name="all_interfaces">All interfaces</string>
@@ -202,7 +205,7 @@
     <string name="once">Once</string>
     <string name="forever">Forever</string>
     <string name="control_permissions">Control permissions</string>
-    <string name="control_permissions_summary">Check which apps are allowed to control the PCAPdroid capture</string>
+    <string name="control_permissions_summary">Check which apps are allowed to control the LeakDefender capture</string>
     <string name="control_permissions_item">%1$s: %2$s</string>
     <string name="country">Country</string>
     <string name="asn">ASN</string>
@@ -232,7 +235,7 @@
     <string name="update_now">Update now</string>
     <string name="status_updating">Updating…</string>
     <string name="malware_detection_learn_more">Learn more about the malware detection feature</string>
-    <string name="private_dns_message_notice">Private DNS prevents PCAPdroid from inspecting the DNS traffic. You can turn it off from the Android network settings</string>
+    <string name="private_dns_message_notice">Private DNS prevents LeakDefender from inspecting the DNS traffic. You can turn it off from the Android network settings</string>
     <string name="private_dns_hinders_detection">Private DNS hinders detection</string>
     <string name="decryption_no_filter_warn">Select a target app or use the decryption whitelist when decrypting TLS to avoid losing your connection to the Internet</string>
     <string name="block">Block…</string>
@@ -274,9 +277,9 @@
     <string name="mitm_setup_wizard">Mitm setup wizard</string>
     <string name="install_action">Install</string>
     <string name="export_action">Export</string>
-    <string name="install_the_mitm_addon">Install the PCAPdroid <a href='%1$s'>mitm addon</a></string>
+    <string name="install_the_mitm_addon">Install the LeakDefender <a href='%1$s'>mitm addon</a></string>
     <string name="configure_action">Configure</string>
-    <string name="grant_mitm_permission">Give PCAPdroid the permission to control the mitm addon</string>
+    <string name="grant_mitm_permission">Give LeakDefender the permission to control the mitm addon</string>
     <string name="export_ca_certificate">Export the PCAPdroid CA certificate, then open the Android \"Encryption &amp; Credentials\" settings and choose install it as a \"CA certificate\"</string>
     <string name="install_ca_certificate">Install the PCAPdroid CA certificate, choosing \"VPN and apps\". Android will ask for your lockscreen or password</string>
     <string name="checking_the_certificate">Checking the certificate…</string>
@@ -284,8 +287,8 @@
     <string name="cert_exported_now_installed">Certificate exported, now install it from the Android settings</string>
     <string name="cert_installed_correctly">The CA certificate is installed</string>
     <string name="cert_reinstall_required">The CA certificate is not installed, run the mitm setup wizard</string>
-    <string name="mitm_addon_bad_version">Bad PCAPdroid mitm addon version. Please install version %1$s and retry</string>
-    <string name="mitm_addon_new_version">The PCAPdroid mitm addon must be upgraded</string>
+    <string name="mitm_addon_bad_version">Bad LeakDefender mitm addon version. Please install version %1$s and retry</string>
+    <string name="mitm_addon_new_version">The LeakDefender mitm addon must be upgraded</string>
     <string name="mitm_addon">mitm addon</string>
     <string name="upgrade_action">Upgrade</string>
     <string name="export_failed">Export failed</string>
@@ -307,7 +310,7 @@
     <string name="decrypted">Decrypted</string>
     <string name="decryption">Decryption</string>
     <string name="decryption_filter">Decryption: %1$s</string>
-    <string name="connection_start_not_seen">PCAPdroid has not seen the start of this connection. Some information may be missing</string>
+    <string name="connection_start_not_seen">LeakDefender has not seen the start of this connection. Some information may be missing</string>
     <string name="network_traffic">Traffic</string>
     <string name="warn_no_app_data">No application data has been exchanged</string>
     <string name="waiting_application_data">Waiting data</string>
@@ -327,7 +330,7 @@
     <string name="size_x">Size: %1$s</string>
     <string name="geo_db_delete">Tap to delete the database and save space</string>
     <string name="download">Download</string>
-    <string name="connection_blocked">This connection has been blocked by PCAPdroid</string>
+    <string name="connection_blocked">This connection has been blocked by LeakDefender</string>
     <string name="import_action">Import</string>
     <string name="import_failed">Import failed</string>
     <string name="invalid_backup">Invalid backup format</string>
@@ -354,22 +357,22 @@
     <string name="block_private_dns">Block private DNS</string>
     <string name="block_private_dns_summary">Detect and possibly block private DNS to inspect DNS traffic. Disabling this can hinder traffic analysis</string>
     <string name="mitm_setup_wizard_intro">This wizard will guide you through the installation of the PCAPdroid mitm addon and certification authority, which are needed to perform the <a href='%1$s'>TLS decryption</a></string>
-    <string name="mitm_setup_wizard_done">PCAPdroid is now ready to decrypt the TLS traffic\n\nCheck out the <a href='%1$s'>user guide</a> to know more about the security measures which may prevent decryption and how to bypass them</string>
-    <string name="welcome_to_pcapdroid">Welcome to PCAPdroid</string>
+    <string name="mitm_setup_wizard_done">LeakDefender is now ready to decrypt the TLS traffic\n\nCheck out the <a href='%1$s'>user guide</a> to know more about the security measures which may prevent decryption and how to bypass them</string>
+    <string name="welcome_to_pcapdroid">Welcome to LeakDefender</string>
     <string name="app_intro_next_button">Next</string>
     <string name="app_intro_skip_button">Skip</string>
     <string name="app_intro_back_button">Back</string>
     <string name="app_intro_done_button">Done</string>
-    <string name="app_intro_welcome_msg">PCAPdroid is a privacy-friendly app which lets you track and analyze the connections made by the apps in your device\n\nMoreover, it allows you to export a PCAP dump of the traffic, extract metadata and much more!</string>
+    <string name="app_intro_welcome_msg">LeakDefender is a privacy-friendly app which lets you track and analyze the connections made by the apps in your device\n\nMoreover, it allows you to export a PCAP dump of the traffic, extract metadata and much more!</string>
     <string name="privacy_first">Privacy first</string>
     <string name="app_intro_privacy_msg">The app does not employ any tracking, analytics or phoning-home anti-features\n\nHow can you be sure? Check out its <a href='%1$s'>privacy policy</a> and its <a href='%2$s'>source code</a></string>
     <string name="country_and_asn">Country and ASN</string>
-    <string name="app_intro_geolocation_msg">PCAPdroid can query a local database to determine the country of a remote server\n\nYou must first download the geolocation database from the app settings</string>
-    <string name="vpn_setup_msg">PCAPdroid simulates a VPN in order to capture the network traffic without root.\n\nTo start the capture, you need to accept the VPN request in the next screen.\n\n<b>NOTE:</b> to proceed, disable any configured Always-on VPN from the Android settings</string>
+    <string name="app_intro_geolocation_msg">LeakDefender can query a local database to determine the country of a remote server\n\nYou must first download the geolocation database from the app settings</string>
+    <string name="vpn_setup_msg">LeakDefender simulates a VPN in order to capture the network traffic without root.\n\nTo start the capture, you need to accept the VPN request in the next screen.\n\n<b>NOTE:</b> to proceed, disable any configured Always-on VPN from the Android settings</string>
     <string name="app_intro_traffic_inspection">Inspecting HTTP requests, responses and raw data is easy, thanks to the built-in decoders\n\nGot an encrypted connection? You can enable the <a href='%1$s'>TLS decryption</a> to get the decrypted data</string>
     <string name="app_intro_firewall_msg">With the integrated <a href='%1$s'>Firewall</a> you can easily block Internet access to individual apps and domains\n\nCombine this with the built-in traffic visibility to get the ultimate tool to protect your privacy</string>
     <string name="app_intro_malware_detection">Enhance the security of your device with the <a href='%1$s'>malware detection</a> feature\n\nBy using up-to-date blacklists, it can detect, block and alert malicious connections in real-time</string>
-    <string name="app_intro_traffic_dump">PCAPdroid provides <a href='%1$s'>multiple ways</a> to dump the traffic in the standard PCAP format for further analysis\n\nVia the <a href='%2$s'>trailer option</a>, you can add app names to the packets and display them in Wireshark</string>
+    <string name="app_intro_traffic_dump">LeakDefender provides <a href='%1$s'>multiple ways</a> to dump the traffic in the standard PCAP format for further analysis\n\nVia the <a href='%2$s'>trailer option</a>, you can add app names to the packets and display them in Wireshark</string>
     <string name="permission_granted">%1$s permission was granted</string>
     <string name="permission_grant_fail">%1$s permission could not be granted</string>
     <string name="connection_not_found">Could not find the given connection</string>
@@ -379,7 +382,7 @@
     <string name="capture_stopped_low_memory">Capture has been stopped</string>
     <string name="heap_usage">Heap usage</string>
     <string name="memory_usage">Memory usage</string>
-    <string name="vpn_lockdown_notice">To prevent apps from accessing the Internet when PCAPdroid is not running (e.g. after a reboot) you can set PCAPdroid as an always-on VPN in lockdown mode.\n\nDo you want to open the VPN settings now?</string>
+    <string name="vpn_lockdown_notice">To prevent apps from accessing the Internet when LeakDefender is not running (e.g. after a reboot) you can set PCAPdroid as an always-on VPN in lockdown mode.\n\nDo you want to open the VPN settings now?</string>
     <string name="ip_mode">VPN IP addresses</string>
     <string name="ipv4_only">IPv4 only</string>
     <string name="ipv6_only">IPv6 only</string>
@@ -399,14 +402,14 @@
     <string name="payload_scams_notice">This view may contain sensitive information, like your passwords and access tokens.\n\nNever give out this information to anyone, it may be a scam attempt</string>
     <string name="cancel_action">Cancel</string>
     <string name="show_data_action">Show data</string>
-    <string name="remote_collector_notice">You have configured PCAPdroid to send traffic to a remote server. The server will be able to access your sensitive information.\n\nIf someone asked you to do this, it is probably a scam attempt</string>
+    <string name="remote_collector_notice">You have configured LeakDefender to send traffic to a remote server. The server will be able to access your sensitive information.\n\nIf someone asked you to do this, it is probably a scam attempt</string>
     <string name="remote_server_warning">For security reasons, sending traffic to the remote server \"%1$s\" is not allowed"</string>
     <string name="warning">Warning</string>
     <string name="paid_features_unlocked">Paid features unlocked. Restart the capture if running</string>
     <string name="build_info">Build info</string>
     <string name="tls_decryption_with_root_msg">The ability to run TLS decryption with root is an experimental feature. This is a list of known bugs:\n\n
-- in PCAPdroid you will see the traffic as it was generated from the mitm-addon app in place of the original app\n
-- when an app filter is set, decryption will only occur for the target app, but PCAPdroid will still show the other apps traffic\n
+- in LeakDefender you will see the traffic as it was generated from the mitm-addon app in place of the original app\n
+- when an app filter is set, decryption will only occur for the target app, but LeakDefender will still show the other apps traffic\n
 - if the capture fails to start, ensure that you can actually run the iptables command as root (e.g. via termux)\n
 - this may not work on Android 12 and later\n
 - if a VPN app is running, you should either target a specific app for decryption or exclude the PCAPdroid mitm addon from the VPN, otherwise traffic will go in a loop
@@ -414,7 +417,7 @@
     <string name="unlock_token_summary">A token which can be used to unlock the paid features in non-Google-Play builds of the app (e.g. F-Droid/Github)</string>
     <string name="unlock_token_error">Could not request unlock token [%1$d]: %2$s</string>
     <string name="access_paid_features_msg">Check out <a href='%1$s'>the user guide</a> to learn how to access the paid features</string>
-    <string name="license_service_unavailable">The PCAPdroid license service is currently unavailable. Please retry in some minutes</string>
+    <string name="license_service_unavailable">The PACPDroid license service is currently unavailable. Please retry in some minutes</string>
     <string name="requesting_unlock_token">Requesting an unlock token, please wait</string>
     <string name="show_action">Show</string>
     <string name="unlock_token_msg1">This is your unlock token. Note it down as you will need it <a href='%1$s'>to generate your license codes</a></string>
@@ -464,7 +467,7 @@
     <string name="connection_error">Connection error: %1$s</string>
     <string name="activate_via_qr_code">Activate via QR code</string>
     <string name="qr_code_expired">QR code expired. Generate a new QR code and retry</string>
-    <string name="qr_info_text">Install PCAPdroid from Google Play and scan this QR code</string>
+    <string name="qr_info_text">Install PCAPDroid from Google Play and scan this QR code</string>
     <string name="qr_purchase_required">Purchase an unlock token to proceed with the QR code activation</string>
     <string name="license_limit_reached">You have reached the licenses limit for this unlock token. Buy a new token to generate more licenses</string>
     <string name="license_error">License generation error [%1$d]: %2$s</string>

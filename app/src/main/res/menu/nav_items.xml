@@ -4,6 +4,7 @@
         <item
             android:id="@+id/item_apps"
             android:title="@string/apps"
+
             android:icon="@drawable/ic_apps" />
         <item
             android:id="@+id/action_stats"

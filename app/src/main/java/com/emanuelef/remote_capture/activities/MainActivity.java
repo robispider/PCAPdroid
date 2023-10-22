@@ -21,8 +21,11 @@ package com.emanuelef.remote_capture.activities;
 
 import android.Manifest;
 import android.content.ActivityNotFoundException;
+import android.content.BroadcastReceiver;
 import android.content.ClipData;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -37,6 +40,7 @@ import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.content.ContextCompat;
 import androidx.core.content.pm.PackageInfoCompat;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
@@ -60,10 +64,12 @@ import com.emanuelef.remote_capture.Billing;
 import com.emanuelef.remote_capture.BuildConfig;
 import com.emanuelef.remote_capture.CaptureHelper;
 import com.emanuelef.remote_capture.ConnectionsRegister;
+import com.emanuelef.remote_capture.ForegroundService;
 import com.emanuelef.remote_capture.Log;
 import com.emanuelef.remote_capture.MitmReceiver;
 import com.emanuelef.remote_capture.PCAPdroid;
 import com.emanuelef.remote_capture.activities.prefs.SettingsActivity;
+import com.emanuelef.remote_capture.dlg.ConnectionAlertDlg;
 import com.emanuelef.remote_capture.fragments.ConnectionsFragment;
 import com.emanuelef.remote_capture.fragments.StatusFragment;
 import com.emanuelef.remote_capture.interfaces.AppStateListener;
@@ -73,6 +79,7 @@ import com.emanuelef.remote_capture.CaptureService;
 import com.emanuelef.remote_capture.model.CaptureSettings;
 import com.emanuelef.remote_capture.MitmAddon;
 import com.emanuelef.remote_capture.model.CaptureStats;
+import com.emanuelef.remote_capture.model.ConnectionDescriptor;
 import com.emanuelef.remote_capture.model.ListInfo;
 import com.emanuelef.remote_capture.model.Prefs;
 import com.emanuelef.remote_capture.R;
@@ -134,13 +141,13 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
             registerForActivityResult(new StartActivityForResult(), this::peerInfoResult);
     private final ActivityResultLauncher<Intent> pcapFileOpenLauncher =
             registerForActivityResult(new StartActivityForResult(), this::pcapFileOpenResult);
-
+private  BroadcastReceiver receiver;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         setTheme(R.style.AppTheme_NoActionBar);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main_activity);
-        setTitle("PCAPdroid");
+        setTitle("LeakDefender");
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 
         int appver = Prefs.getAppVersion(mPrefs);
@@ -203,12 +210,64 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
             } else /* STOPPED -> STOPPED */
                 appStateReady();
         });
-    }
+
+
+            //hct Check if the intent has the ACTION_NOTIFY_PAUSED_CONNECTION action
+            if (getIntent() != null && "ACTION_NOTIFY_PAUSED_CONNECTION".equals(getIntent().getAction())) {
+                // Bring the application to the foreground
+                Intent foregroundIntent = new Intent(this, MainActivity.class);
+                foregroundIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                startActivity(foregroundIntent);
+
+                // Handle the notification data (if needed)
+                int targetAppId = getIntent().getIntExtra("target_appid", 0);
+                int connId = getIntent().getIntExtra("conn_id", -1);
+                float dataSize = getIntent().getFloatExtra("data_size", 0.0f);
+                String message = getIntent().getStringExtra("message");
+                // Handle the data as needed
+            }
+
+
+        // Register a broadcast receiver to receive the broadcast
+        if (receiver!=null)
+        {
+            unregisterReceiver(receiver);
+            receiver=null;
+        }
+
+        if (receiver==null) {
+            receiver = new BroadcastReceiver() {
+
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    if ("ACTION_NOTIFY_PAUSED_CONNECTION".equals(intent.getAction())) {
+                        int target_appid = intent.getIntExtra("target_appid", 0);
+                        String message = intent.getStringExtra("message");
+                        int conn_id = intent.getIntExtra("conn_id", -1);
+                        float load = intent.getFloatExtra("data_size", 0.0f);
+                        // Show the alert dialog using MainActivity context
+                        // Bring the application to the foreground by starting an activity
+                        Intent bringToForegroundIntent = new Intent(context, MainActivity.class);
+                        bringToForegroundIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                        context.startActivity(bringToForegroundIntent);
+
+
+                        ConnectionAlertDlg connectionAlertDlg = new ConnectionAlertDlg(MainActivity.this, target_appid, conn_id);
+                        connectionAlertDlg.showConnectionAlert(MainActivity.this, message);
+                    }
+                }
+            };
+        }
+        // Register the receiver with the specific action
+        IntentFilter filter = new IntentFilter("ACTION_NOTIFY_PAUSED_CONNECTION");
+        registerReceiver(receiver, filter);
+}
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
+        // Unregister the broadcast receiver
+        unregisterReceiver(receiver);
         if(!CaptureService.isServiceActive()) {
             boolean ignored = getTmpPcapPath().delete();
         }
@@ -246,6 +305,11 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         mNavView = findViewById(R.id.nav_view);
         mNavView.setNavigationItemSelectedListener(this);
         View header = mNavView.getHeaderView(0);
+        Menu navMenu = mNavView.getMenu();
+        navMenu.findItem(R.id.action_donate).setVisible(false);
+        navMenu.findItem(R.id.action_open_user_guide).setVisible(false);
+        navMenu.findItem(R.id.action_share_app).setVisible(false);
+        navMenu.findItem(R.id.action_open_telegram).setVisible(false);
 
         TextView appVer = header.findViewById(R.id.app_version);
         String verStr = Utils.getAppVersion(this);
@@ -697,6 +761,13 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         CaptureSettings settings = new CaptureSettings(this, mPrefs);
         settings.input_pcap_path = input_pcap_path;
         mCapHelper.startCapture(settings);
+
+        //hct
+        // Start the foreground service with user input
+//        String userInput = "User input from the notification";
+//        Intent serviceIntent = new Intent(MainActivity.this, ForegroundService.class);
+//        serviceIntent.putExtra("inputExtra", userInput);
+//        ContextCompat.startForegroundService(MainActivity.this, serviceIntent);
     }
 
     public void startCapture() {

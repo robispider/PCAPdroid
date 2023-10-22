@@ -25,12 +25,266 @@
 #include "common/utils.h"
 #include "pcapd/pcapd.h"
 #include "ndpi_protocol_ids.h"
-
+#include <stdio.h>
+#include <android/log.h>
 extern int run_vpn(pcapdroid_t *pd);
 extern int run_libpcap(pcapdroid_t *pd);
 extern void libpcap_iter_connections(pcapdroid_t *pd, conn_cb cb);
 extern void vpn_process_ndpi(pcapdroid_t *pd, const zdtun_5tuple_t *tuple, pd_conn_t *data);
 
+
+/* hct Global variable declaration */
+#define MAX_CONNECTIONS 50 // Define the maximum number of connections as needed
+int pause_conn_id[MAX_CONNECTIONS]; // An array to store connection IDs
+pthread_mutex_t pause_conn_id_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+/* Initialize and reset the pause_conn_id array to -1 */
+void initialize_pause_conn_id() {
+    for (int i = 0; i < MAX_CONNECTIONS; ++i) {
+        pause_conn_id[i] = -1;
+    }
+}
+
+/* ************************************ */
+// hct function added
+void pause_a_conn(int id) {
+    __android_log_print(ANDROID_LOG_DEBUG, "hct con_pause", "java msg in: %d",id);
+    if (is_conn_paused(id))
+        return;
+    pthread_mutex_lock(&pause_conn_id_mutex); // Lock the mutex before accessing pause_conn_id
+    for (int i = 0; i < MAX_CONNECTIONS; ++i) {
+        if (pause_conn_id[i] == -1) {
+            pause_conn_id[i] = id; // Assign the connection ID to the first available slot
+            break;
+        }
+    }
+    pthread_mutex_unlock(&pause_conn_id_mutex); // Unlock the mutex after updating pause_conn_id
+}
+void resume_a_conn(int id) {
+    __android_log_print(ANDROID_LOG_DEBUG, "hct con_resume", "java msg in: %d",id);
+    pthread_mutex_lock(&pause_conn_id_mutex); // Lock the mutex before accessing pause_conn_id
+    for (int i = 0; i < MAX_CONNECTIONS; ++i) {
+        if (pause_conn_id[i] == id) {
+            pause_conn_id[i] = -1; // Set the slot to -1, indicating that the connection is no longer paused
+            break;
+        }
+    }
+    pthread_mutex_unlock(&pause_conn_id_mutex); // Unlock the mutex after updating pause_conn_id
+}
+bool is_conn_paused(int id) {
+    int result = 0; // 0 means ID is not found, 1 means ID is found
+    pthread_mutex_lock(&pause_conn_id_mutex); // Lock the mutex before accessing pause_conn_id
+    for (int i = 0; i < MAX_CONNECTIONS; ++i) {
+        if (pause_conn_id[i] == id) {
+            pthread_mutex_unlock(&pause_conn_id_mutex);
+            return true;
+        }
+    }
+    pthread_mutex_unlock(&pause_conn_id_mutex); // Unlock the mutex after accessing pause_conn_id
+    return false;
+}
+
+void jnotifyPausedConnection(JNIEnv *env, jobject vpn_inst, int conn_key, int app_id, float mb) {
+
+    // jmethodID midMethod = jniGetMethodID(env, cls.vpn_service, mids.isConnectionBlockExist, "(I)Z");
+
+    if (!mids.jnotifyPausedConnection)
+        return;
+
+    (*env)->CallVoidMethod(env, vpn_inst, mids.jnotifyPausedConnection,conn_key,app_id,mb);
+    jniCheckException(env);
+
+
+    return;
+}
+bool isConnectionBlocked(JNIEnv *env, jobject vpn_inst, int key) {
+    bool rv = false;
+   // jmethodID midMethod = jniGetMethodID(env, cls.vpn_service, mids.isConnectionBlockExist, "(I)Z");
+
+   if (!mids.isConnectionBlockExist)
+       return  rv;
+
+    rv = (*env)->CallBooleanMethod(env, vpn_inst, mids.isConnectionBlockExist,key);
+    jniCheckException(env);
+
+    log_d("getIntPref(%s) = %d", "isConnectionExist", rv);
+
+    return(rv);
+}
+//
+//JavaVM* g_vm;
+//JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
+//    g_vm = vm;
+//    return JNI_VERSION_1_6;
+//}
+//bool isConnectionBlocked(int key) {
+//    JNIEnv* env;
+//    // Get JNI environment
+//    JNIEnv *env = JniGetEnv();
+//
+//    // Attaching the current thread to the JavaVM
+//    if ((*g_vm)->AttachCurrentThread(g_vm, &env, NULL) != JNI_OK) {
+//        // Handle the error, for example, by returning a default value like false
+//        return false;
+//    }
+//
+//    // Finding the class
+//    jclass clazz = (*env)->FindClass(env, "com/emanuelef/remote_capture/CaptureService");
+//
+//    // Getting the static method ID
+//    jmethodID methodId = (*env)->GetStaticMethodID(env, clazz, "isConnectionExist", "(I)Z");
+//
+//    // Calling the static method if found
+//    if (methodId != NULL) {
+//        jboolean result = (*env)->CallStaticBooleanMethod(env, clazz, methodId, key);
+//        // Detaching the thread from the JavaVM
+//        (*g_vm)->DetachCurrentThread(g_vm);
+//        return result;
+//    } else {
+//        // Handle method not found error (return false by default)
+//        // Detaching the thread from the JavaVM
+//        (*g_vm)->DetachCurrentThread(g_vm);
+//        return false;
+//    }
+//}
+
+
+
+void block_a_conn(int id) {
+
+    pthread_mutex_lock(&pause_conn_id_mutex); // Lock the mutex before accessing pause_conn_id
+    for (int i = 0; i < MAX_CONNECTIONS; ++i) {
+        if (pause_conn_id[i] == id) {
+            pause_conn_id[i] = -1; // Set the slot to -1, indicating that the connection is no longer paused
+            break;
+        }
+
+    }
+    pthread_mutex_unlock(&pause_conn_id_mutex); // Unlock the mutex after updating pause_conn_id
+}
+void block_a_connection(int key) {
+     pd_conn_t *conn= findConnection(key);
+    if (conn)
+    {
+        conn->to_block=true;
+        conn->blacklisted_internal=true;
+        resume_a_conn(key);
+    }
+
+}
+
+// Define a mutex for synchronization
+pthread_mutex_t hashTableMutex = PTHREAD_MUTEX_INITIALIZER;
+
+pd_conn_t* connectionsHash = NULL;
+
+void addConnection(pd_conn_t* connPtr) {
+    if (connPtr == NULL) {
+        fprintf(stderr, "Error: Cannot add NULL connection.\n");
+        return;
+    }
+
+    pthread_mutex_lock(&hashTableMutex); // Lock before accessing shared data
+
+
+    pd_conn_t* existingConn;
+    HASH_FIND_INT(connectionsHash, &connPtr->incr_id, existingConn);
+    if (existingConn != NULL) {
+        fprintf(stderr, "Error: Connection with ID %d already exists.\n", connPtr->incr_id);
+        pthread_mutex_unlock(&hashTableMutex); // Unlock before returning
+        return;
+    }
+
+    HASH_ADD_INT(connectionsHash, incr_id, connPtr);
+
+    pthread_mutex_unlock(&hashTableMutex); // Unlock after modifying shared data
+}
+
+pd_conn_t* findConnection(int _id) {
+    pthread_mutex_lock(&hashTableMutex); // Lock before accessing shared data
+
+    pd_conn_t* conn;
+    HASH_FIND_INT(connectionsHash, &_id, conn);
+    if (conn == NULL) {
+        fprintf(stderr, "Error: Connection with ID %d not found.\n", _id);
+    }
+
+    pthread_mutex_unlock(&hashTableMutex); // Unlock before returning
+    return conn;
+}
+
+void removeConnection(int _id) {
+    pthread_mutex_lock(&hashTableMutex); // Lock before accessing shared data
+
+    pd_conn_t* conn;
+    HASH_FIND_INT(connectionsHash, &_id, conn);
+    if (conn != NULL) {
+        HASH_DEL(connectionsHash, conn);
+        // Free resources if needed: free(conn);
+        printf("Connection with ID %d removed successfully.\n", _id);
+    } else {
+        fprintf(stderr, "Error: Connection with ID %d not found.\n", _id);
+    }
+
+    pthread_mutex_unlock(&hashTableMutex); // Unlock after modifying shared data
+}
+//
+//#define MAX_CONNECTIONS 1000
+//
+//
+//
+//struct {
+//    struct pcap_conn_t* connections[MAX_CONNECTIONS];
+//    bool available[MAX_CONNECTIONS];
+//} StackTable;
+//
+//void initializeStackTable() {
+//    for (int i = 0; i < MAX_CONNECTIONS; ++i) {
+//        StackTable.connections[i] = NULL;
+//        StackTable.available[i] = true;
+//    }
+//}
+//
+//void addConnection(int connectionId, struct pd_conn_t* connPtr) {
+//    if (connectionId >= 0 && connectionId < MAX_CONNECTIONS) {
+//        if (StackTable.available[connectionId]) {
+//            StackTable.connections[connectionId] = connPtr;
+//            StackTable.available[connectionId] = false;
+//        } else {
+//           // __android_log_print(ANDROID_LOG_ERROR, "NativeCode", "Error: Connection ID %d is not available!", connectionId);
+//        }
+//    } else {
+//      //  __android_log_print(ANDROID_LOG_ERROR, "NativeCode", "Error: Invalid connection ID %d!", connectionId);
+//    }
+//}
+//
+//void removeConnection(int connectionId) {
+//    if (connectionId >= 0 && connectionId < MAX_CONNECTIONS) {
+//        if (!StackTable.available[connectionId] && StackTable.connections[connectionId] != NULL) {
+//            free(StackTable.connections[connectionId]); // Free the memory allocated for the connection
+//            StackTable.connections[connectionId] = NULL;
+//            StackTable.available[connectionId] = true;
+//        } else {
+//          //  __android_log_print(ANDROID_LOG_ERROR, "NativeCode", "Error: Connection with ID %d not found!", connectionId);
+//        }
+//    } else {
+//      //  __android_log_print(ANDROID_LOG_ERROR, "NativeCode", "Error: Invalid connection ID %d!", connectionId);
+//    }
+//}
+//
+// pd_conn_t* findConnection(int connectionId) {
+//    if (connectionId >= 0 ) {
+//        if (!StackTable.available[connectionId] && StackTable.connections[connectionId] != NULL) {
+//            return StackTable.connections[connectionId];
+//        } else {
+//        //    __android_log_print(ANDROID_LOG_ERROR, "NativeCode", "Error: Connection with ID %d not found!", connectionId);
+//        }
+//    } else {
+//       // __android_log_print(ANDROID_LOG_ERROR, "NativeCode", "Error: Invalid connection ID %d!", connectionId);
+//    }
+//    return NULL;
+//}
+/* ******************************************************* */
 /* ******************************************************* */
 
 bool running = false;
@@ -179,7 +433,7 @@ static void conns_clear(pcapdroid_t *pd, conn_array_t *arr, bool free_all) {
 }
 
 /* ******************************************************* */
-
+//hct appname
 char* get_appname_by_uid(pcapdroid_t *pd, int uid, char *buf, int bufsize) {
 #ifdef ANDROID
     uid_to_app_t *app_entry;
@@ -285,8 +539,10 @@ const char* pd_get_proto_name(pcapdroid_t *pd, uint16_t proto, uint16_t alpn, in
 }
 
 /* ******************************************************* */
-
+//hct
 static void check_blacklisted_domain(pcapdroid_t *pd, pd_conn_t *data, const zdtun_5tuple_t *tuple) {
+
+
     if(data->info && data->info[0]) {
         if(pd->malware_detection.bl && !data->blacklisted_domain && !data->whitelisted_app) {
             bool blacklisted = blacklist_match_domain(pd->malware_detection.bl, data->info);
@@ -336,7 +592,56 @@ static void check_whitelist_mode_block(pcapdroid_t *pd, const zdtun_5tuple_t *tu
             (!is_dns || ((data->uid != UID_NETD) && (data->uid != UID_PHONE) && (data->uid != UID_UNKNOWN))))
         data->to_block = !blacklist_match_uid(pd->firewall.wl, data->uid);
 }
+//hct: function added to check if an app is blacklisted and block the app as well
+static void check_blacklist_mode_app(pcapdroid_t *pd, pd_conn_t *data) {
+    // Check for valid input pointers and data->uid
+    if (!pd || !pd->malware_detection.bl || !data || !data->uid) {
+        // Handle invalid input or data
+        return;
+    }
 
+    // Check if the UID is blacklisted
+    if (blacklist_match_uid(pd->malware_detection.bl, data->uid)) {
+        // Log the blacklisted app and set internal flags
+        log_w("Blacklisted app: %s", data->info);
+        data->blacklisted_internal = true;
+        data->to_block = true;
+    }
+}
+
+//hct function to pause conn
+void wait_if_conn_paused(pd_conn_t *conn) {
+    if (!is_conn_paused(conn->incr_id)) {
+        __android_log_print(ANDROID_LOG_DEBUG, "hct con_wait", "pause=false %d, app %d", conn->incr_id,conn->uid);
+        return;
+    }
+    __android_log_print(ANDROID_LOG_DEBUG, "hct con_wait", "pause=true %d, %d", conn->incr_id,conn->uid);
+    // Initialize the mutex if it's NULL
+    if (conn->mutex == NULL) {
+        conn->mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+        pthread_mutex_init(conn->mutex, NULL);
+    }
+
+    // Lock the mutex for synchronization
+    pthread_mutex_lock(conn->mutex);
+
+    // Check if the connection is paused
+    while (is_conn_paused(conn->incr_id)) {
+        // Release the mutex and wait for 200ms
+        pthread_mutex_unlock(conn->mutex);
+        usleep(200000); // 200ms in microseconds
+        pthread_mutex_lock(conn->mutex);
+
+        // If conn->is_conn_paused is false, break the loop
+        if (!is_conn_paused(conn->incr_id)) {
+            break;
+        }
+    }
+
+    // Unlock the mutex after handling the condition
+    pthread_mutex_unlock(conn->mutex);
+    __android_log_print(ANDROID_LOG_DEBUG, "hct con_wait", "wait exit %d", conn->incr_id);
+}
 /* ******************************************************* */
 
 pd_conn_t* pd_new_connection(pcapdroid_t *pd, const zdtun_5tuple_t *tuple, int uid) {
@@ -346,6 +651,23 @@ pd_conn_t* pd_new_connection(pcapdroid_t *pd, const zdtun_5tuple_t *tuple, int u
                     errno, strerror(errno));
         return(NULL);
     }
+
+    //hct pause processing 
+
+    //wait_if_conn_paused(data);//not needed
+
+//    __android_log_print(ANDROID_LOG_DEBUG, "hct con_c_block", "block test %d, app %d", data->incr_id,data->uid);
+//    bool blocked=isConnectionBlocked( pd->env,pd->capture_service ,data->incr_id);
+//    if (blocked)
+//    {
+//        __android_log_print(ANDROID_LOG_DEBUG, "hct con_c_block", "block=true %d, app %d", data->incr_id,data->uid);
+//
+//        data->to_block=true;
+//        data->to_purge=true;
+//        data->blacklisted_internal=true;
+//        return(data);
+//    }
+
 
     /* nDPI */
     if((data->ndpi_flow = ndpi_calloc(1, SIZEOF_FLOW_STRUCT)) == NULL) {
@@ -361,6 +683,7 @@ pd_conn_t* pd_new_connection(pcapdroid_t *pd, const zdtun_5tuple_t *tuple, int u
 
     data->uid = uid;
     data->incr_id = pd->new_conn_id++;
+    //addConnection(data);
 
     if(pd->malware_detection.whitelist) {
         // NOTE: if app is whitelisted, no need to check for blacklisted IP/domains
@@ -380,6 +703,8 @@ pd_conn_t* pd_new_connection(pcapdroid_t *pd, const zdtun_5tuple_t *tuple, int u
     data->info = ip_lru_find(pd->ip_to_host, &dst_ip);
 
     if(data->info) {
+
+
         char resip[INET6_ADDRSTRLEN];
         int family = (tuple->ipver == 4) ? AF_INET : AF_INET6;
 
@@ -423,7 +748,10 @@ pd_conn_t* pd_new_connection(pcapdroid_t *pd, const zdtun_5tuple_t *tuple, int u
         }
 
         check_blacklisted_domain(pd, data, tuple);
+        //hct code added to block app
+        check_blacklist_mode_app(pd,data);
     }
+
 
     if(pd->malware_detection.bl) {
         if(!data->whitelisted_app) {
@@ -496,6 +824,11 @@ static bool is_numeric_host(const char *host) {
 
 static void process_ndpi_data(pcapdroid_t *pd, const zdtun_5tuple_t *tuple, pd_conn_t *data) {
     char *found_info = NULL;
+    __android_log_print(ANDROID_LOG_DEBUG, "hct con_ndpi", " %d, app %d", data->incr_id,data->uid);
+
+   // wait_if_conn_paused(data);//not needed
+    //hct
+
 
     switch(data->l7proto) {
         case NDPI_PROTOCOL_TLS:
@@ -540,9 +873,20 @@ static void process_ndpi_data(pcapdroid_t *pd, const zdtun_5tuple_t *tuple, pd_c
         data->info_from_lru = false;
 
         check_blacklisted_domain(pd, data, tuple);
+        //hct code added to block app
+        check_blacklist_mode_app(pd,data);
         data->update_type |= CONN_UPDATE_INFO;
-    }
 
+    }
+//    __android_log_print(ANDROID_LOG_DEBUG, "hct con_c_block", "ndpi block test %d, app %d", data->incr_id,data->uid);
+//    bool blocked=isConnectionBlocked( pd->env,pd->capture_service ,data->incr_id);
+//    if (blocked)
+//    {
+//        __android_log_print(ANDROID_LOG_DEBUG, "hct con_c_block", "ndpi block=true %d, app %d", data->incr_id,data->uid);
+//        data->blacklisted_internal=true;
+//        data->to_block=true;
+//        data->to_purge=true;
+//    }
     if(pd->vpn_capture)
         vpn_process_ndpi(pd, tuple, data);
 }
@@ -870,6 +1214,8 @@ static void* load_new_blacklists(void *data) {
     // Test domain/IP to test blacklist match
     blacklist_add_domain(bl, "internetbadguys.com");
     blacklist_add_ipstr(bl, "0.0.0.1");
+    //blacklist_add_uid(bl,10224);
+
 
     log_d("Blacklists loaded in %.3f sec", ((double) (clock() - start)) / CLOCKS_PER_SEC);
 
@@ -887,6 +1233,7 @@ struct iter_conn_data {
 };
 
 static int zdtun_iter_adapter(zdtun_t *zdt, const zdtun_conn_t *conn_info, void *data) {
+
     struct iter_conn_data *idata = (struct iter_conn_data*) data;
     const zdtun_5tuple_t *tuple = zdtun_conn_get_5tuple(conn_info);
     pd_conn_t *conn = zdtun_conn_get_userdata(conn_info);
@@ -1082,7 +1429,7 @@ void pd_refresh_time(pcapdroid_t *pd) {
 }
 
 /* ******************************************************* */
-
+//hct Native function for processing each packet
 /* Process the packet (e.g. perform DPI) and fill the packet context. */
 void pd_process_packet(pcapdroid_t *pd, zdtun_pkt_t *pkt, bool is_tx, const zdtun_5tuple_t *tuple,
                        pd_conn_t *data, struct timeval *tv, pkt_context_t *pctx) {
@@ -1092,6 +1439,59 @@ void pd_process_packet(pcapdroid_t *pd, zdtun_pkt_t *pkt, bool is_tx, const zdtu
     pctx->is_tx = is_tx;
     pctx->tuple = tuple;
     pctx->data = data;
+    //hct
+ float payload_mb=(float)data->payload_length / (1024 * 1024);
+ if (payload_mb>pd->max_payload_length ) {
+     if (!data->is_conn_paused) {
+
+
+         data->is_conn_paused = true;
+         pause_a_conn(data->incr_id);
+         __android_log_print(ANDROID_LOG_DEBUG, "hct con_pkt",
+                             "pkt conn paused, conn: %d, app %d, payload: %.2f MB",
+                             data->incr_id, data->uid,
+                             (float) data->payload_length / (1024 * 1024));
+         jnotifyPausedConnection(pd->env,pd->capture_service, data->incr_id, data->uid, payload_mb);
+
+     }else{
+        if ( is_conn_paused(data->incr_id))
+        {
+
+            __android_log_print(ANDROID_LOG_DEBUG, "hct con_pkt",
+                                "pkt conn paused already, entering wait, conn: %d, app %d, payload: %.2f MB",
+                                data->incr_id, data->uid,
+                                (float) data->payload_length / (1024 * 1024));
+            wait_if_conn_paused(data);
+            __android_log_print(ANDROID_LOG_DEBUG, "hct con_pkt",
+                                "pkt conn paused already, exit wait, conn: %d, app %d, payload: %.2f MB",
+                                data->incr_id, data->uid,
+                                (float) data->payload_length / (1024 * 1024));
+        }
+        else
+        {
+            __android_log_print(ANDROID_LOG_DEBUG, "hct con_pkt",
+                                "pkt conn resumed, conn: %d, app %d, payload: %.2f MB",
+                                data->incr_id, data->uid,
+                                (float) data->payload_length / (1024 * 1024));
+        }
+
+
+     }
+        bool isBlocked= isConnectionBlocked(pd->env,pd->capture_service,data->incr_id);
+     if (isBlocked)
+     {
+         __android_log_print(ANDROID_LOG_DEBUG, "hct con_pkt",
+                             "pkt conn blocking, conn: %d, app %d, payload: %.2f MB",
+                             data->incr_id, data->uid,
+                             (float) data->payload_length / (1024 * 1024));
+         data->blacklisted_internal=true;
+         data->to_block=true;
+        // data->to_purge=true;
+
+     }
+
+    }
+
 
     // NOTE: pd_account_stats will not be called for blocked connections
     data->last_seen = pctx->ms;
@@ -1156,7 +1556,8 @@ int pd_run(pcapdroid_t *pd) {
     running = true;
     has_seen_pcapdroid_trailer = false;
     netd_resolve_waiting = 0;
-
+    //hct
+    initialize_pause_conn_id();
     /* nDPI */
     pd->ndpi = init_ndpi();
     if(pd->ndpi == NULL) {
@@ -1165,6 +1566,10 @@ int pd_run(pcapdroid_t *pd) {
     }
 
     pd->ip_to_host = ip_lru_init(MAX_HOST_LRU_SIZE);
+    //hct added to load block list at load
+    reload_blacklists_now=true;
+    //hct added
+   // initializeStackTable();
 
     if(pd->malware_detection.enabled && pd->cb.load_blacklists_info)
         pd->cb.load_blacklists_info(pd);

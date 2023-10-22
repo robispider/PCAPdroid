@@ -267,6 +267,7 @@ public class AppsFragment extends Fragment implements ConnectionsListener, MenuP
         } else
             blocklist.saveAndReload();
 
+
         // refresh the item
         mAdapter.notifyItemChanged(app);
 

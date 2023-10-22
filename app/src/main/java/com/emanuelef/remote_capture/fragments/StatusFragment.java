@@ -27,6 +27,8 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.InputType;
+import android.text.TextUtils;
 import android.text.method.LinkMovementMethod;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -35,6 +37,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
+import android.widget.Button;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -60,6 +63,20 @@ import com.emanuelef.remote_capture.model.Prefs;
 import com.emanuelef.remote_capture.model.CaptureStats;
 import com.emanuelef.remote_capture.views.AppSelectDialog;
 import com.emanuelef.remote_capture.views.PrefSpinner;
+import android.app.AlertDialog;
+
+import android.content.DialogInterface;
+
+import android.widget.EditText;
+
+
+import android.text.InputFilter;
+import android.text.Spanned;
+
+import android.widget.Toast;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class StatusFragment extends Fragment implements AppStateListener, MenuProvider {
     private static final String TAG = "StatusFragment";
@@ -79,7 +96,9 @@ public class StatusFragment extends Fragment implements AppStateListener, MenuPr
     private String mAppFilter;
     private TextView mFilterWarning;
     private AppSelectDialog mAppSelDialog;
-
+    //private EditText numberInput;
+    private TextView maxAllowedTextView;
+    private  Button BtnSetMaxAllowed;
     @Override
     public void onAttach(@NonNull Context context) {
         super.onAttach(context);
@@ -99,12 +118,32 @@ public class StatusFragment extends Fragment implements AppStateListener, MenuPr
         super.onResume();
         refreshStatus();
     }
-
+    private String loadMaxAllowedBandwidth() {
+        SharedPreferences preferences = requireActivity().getPreferences(Context.MODE_PRIVATE);
+        return preferences.getString(Prefs.PREF_MAX_ALLOWED_SIZE, "2.00");
+    }
+    //hct modified
     @Override
     public View onCreateView(LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {
         requireActivity().addMenuProvider(this, getViewLifecycleOwner(), Lifecycle.State.RESUMED);
-        return inflater.inflate(R.layout.status, container, false);
+        View view = inflater.inflate(R.layout.status, container, false);
+       // numberInput = view.findViewById(R.id.editTextMaxAllow); // Assuming you have an EditText in your XML layout with the id "editTextNumber"
+        // Load and set max_allowed_bw value to textViewNumber
+        String maxAllowedBandwidth = loadMaxAllowedBandwidth();
+         maxAllowedTextView = view.findViewById(R.id.textViewNumber);
+        maxAllowedTextView.setText(maxAllowedBandwidth);
+
+         BtnSetMaxAllowed = view.findViewById(R.id.btnSetMaxAllowed); // Assuming you have a Button in your XML layout with the id "buttonShowDialog"
+
+        BtnSetMaxAllowed.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                showNumberInputDialog();
+            }
+        });
+
+        return view;
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -118,6 +157,7 @@ public class StatusFragment extends Fragment implements AppStateListener, MenuPr
         mFilterWarning = view.findViewById(R.id.app_filter_warning);
         mPrefs = PreferenceManager.getDefaultSharedPreferences(mActivity);
         mAppFilter = Prefs.getAppFilter(mPrefs);
+
 
         PrefSpinner.init(view.findViewById(R.id.dump_mode_spinner),
                 R.array.pcap_dump_modes, R.array.pcap_dump_modes_labels, R.array.pcap_dump_modes_descriptions,
@@ -173,6 +213,7 @@ public class StatusFragment extends Fragment implements AppStateListener, MenuPr
         /* Important: call this after all the fields have been initialized */
         mActivity.setAppStateListener(this);
         refreshStatus();
+
     }
 
     @Override
@@ -321,11 +362,14 @@ public class StatusFragment extends Fragment implements AppStateListener, MenuPr
                 mStopBtn.setEnabled(true);
                 mStopBtn.setVisible(!CaptureService.isAlwaysOnVPN());
                 mMenuSettings.setEnabled(false);
+                BtnSetMaxAllowed.setEnabled(false);//hct
+
             } else { // ready || starting
                 mStopBtn.setVisible(false);
                 mStartBtn.setEnabled(true);
                 mStartBtn.setVisible(!CaptureService.isAlwaysOnVPN());
                 mMenuSettings.setEnabled(true);
+                BtnSetMaxAllowed.setEnabled(true);//hct
             }
         }
 
@@ -409,4 +453,77 @@ public class StatusFragment extends Fragment implements AppStateListener, MenuPr
             mAppSelDialog = null;
         }
     }
+    //hct
+    private void showNumberInputDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireActivity());
+        builder.setTitle("Enter a Number");
+
+
+
+
+        final EditText input = new EditText(requireActivity());
+        input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        input.setFilters(new InputFilter[]{new DecimalDigitsInputFilter(5, 2)}); // Restrict to 5 digits including 2 decimal places
+
+        // Load initial number from textViewNumber and set it to the input field
+
+        String initialNumber = maxAllowedTextView.getText().toString();
+        if (!TextUtils.isEmpty(initialNumber)) {
+            input.setText(initialNumber);
+            input.setSelection(initialNumber.length()); // Place cursor at the end of the text
+        }
+
+        builder.setView(input);
+
+        builder.setPositiveButton("Save", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                String number = input.getText().toString();
+                // Validate if the input is a valid number before saving
+                if (!number.isEmpty() && isValidDecimal(number)) {
+                    // Save the number into SharedPreferences
+                    SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(requireContext());
+                    Prefs.setPrefMaxAllowedSize(prefs, Float.valueOf(number));
+
+
+                    // Set the accepted number back to textViewNumber
+                    maxAllowedTextView.setText(number);
+                } else {
+                    // Show an error message if the input is not a valid number
+                    Toast.makeText(requireActivity(), "Invalid input. Please enter a valid number with two decimal places.", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
+        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                dialogInterface.cancel();
+            }
+        });
+
+        builder.show();
+    }
+
+    // Helper method to check if a string is a valid decimal with two decimal places
+    private boolean isValidDecimal(String str) {
+        return str.matches("^\\d{1,3}(\\.\\d{1,2})?$"); // Matches up to 3 digits before decimal and up to 2 decimal places
+    }
+
+    // InputFilter to restrict decimal input to a specific number of digits before and after the decimal point
+    public class DecimalDigitsInputFilter implements InputFilter {
+        private Pattern mPattern;
+
+        public DecimalDigitsInputFilter(int digitsBeforeZero, int digitsAfterZero) {
+            mPattern = Pattern.compile("[0-9]{0," + digitsBeforeZero + "}+((\\.[0-9]{0," + digitsAfterZero + "})?)||(\\.)?");
+        }
+
+        @Override
+        public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+            Matcher matcher = mPattern.matcher(dest);
+            if (!matcher.matches()) return "";
+            return null;
+        }
+    }
+
 }

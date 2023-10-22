@@ -108,7 +108,7 @@ public class ConnectionsFragment extends Fragment implements ConnectionsListener
     @Override
     public void onResume() {
         super.onResume();
-
+        android.util.Log.d("hct", "connectionFragment onResume: ");
         refreshEmptyText();
 
         registerConnsListener();
@@ -120,7 +120,7 @@ public class ConnectionsFragment extends Fragment implements ConnectionsListener
     @Override
     public void onPause() {
         super.onPause();
-
+        android.util.Log.d("hct", "connectionFragment onPause: ");
         unregisterConnsListener();
         mRecyclerView.setEmptyView(null);
 
@@ -175,6 +175,7 @@ public class ConnectionsFragment extends Fragment implements ConnectionsListener
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        android.util.Log.d("hct", "connectionFragment tatonViewCreated: ");
         mHandler = new Handler(Looper.getMainLooper());
         mFabDown = view.findViewById(R.id.fabDown);
         mRecyclerView = view.findViewById(R.id.connections_view);
@@ -291,6 +292,7 @@ public class ConnectionsFragment extends Fragment implements ConnectionsListener
         ConnectionDescriptor conn = mAdapter.getSelectedItem();
         if(conn == null)
             return;
+        android.util.Log.d(TAG, "onCreateContextMenu: hct "+conn.uid);
 
         AppDescriptor app = mApps.getAppByUid(conn.uid, 0);
         Context ctx = requireContext();
@@ -494,6 +496,7 @@ public class ConnectionsFragment extends Fragment implements ConnectionsListener
     @Override
     public boolean onContextItemSelected(@NonNull MenuItem item) {
         Context ctx = requireContext();
+        android.util.Log.d("hct", "onContextItemSelected cnn fragment: ");
         ConnectionDescriptor conn = mAdapter.getSelectedItem();
         MatchList whitelist = PCAPdroid.getInstance().getMalwareWhitelist();
         MatchList fwWhitelist = PCAPdroid.getInstance().getFirewallWhitelist();
@@ -512,6 +515,12 @@ public class ConnectionsFragment extends Fragment implements ConnectionsListener
         int id = item.getItemId();
 
         if(id == R.id.hide_app) {
+            //hct test
+            blocklist.addApp(conn.uid);
+            blocklist.saveAndReload();
+            CaptureService.addToBlocklist(blocklist.toListDescriptor(),conn.uid);
+
+            CaptureService.requireInstance().reloadBlocklist();
             mAdapter.mMask.addApp(conn.uid);
             mask_changed = true;
         } else if(id == R.id.hide_host) {

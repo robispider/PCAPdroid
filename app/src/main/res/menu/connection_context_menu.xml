@@ -4,13 +4,13 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <item
-        android:title="@string/hide">
+        android:title="@string/block">
         <menu>
             <item
                 android:id="@+id/hide_app"
                 android:title=""
                 tools:title="@string/app_val"
-                android:visible="false" />
+                android:visible="true" />
 
             <item
                 android:id="@+id/hide_ip"

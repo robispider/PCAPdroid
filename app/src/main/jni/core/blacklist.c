@@ -21,6 +21,10 @@
 #include <string.h>
 #include "pcapdroid.h"
 #include "common/utils.h"
+//hct for making shared data access thread safe
+#include <pthread.h>
+
+pthread_mutex_t blacklist_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 typedef struct {
     char *key;
@@ -104,20 +108,74 @@ int blacklist_add_ipstr(blacklist_t *bl, const char *ip) {
 }
 
 /* ******************************************************* */
-
+//
+//int blacklist_add_uid(blacklist_t *bl, int uid) {
+//    if(blacklist_match_uid(bl, uid))
+//        return -EADDRINUSE; // duplicate uid
+//
+//    int_entry_t *entry = bl_malloc(sizeof(int_entry_t));
+//    if(!entry)
+//        return -ENOMEM;
+//
+//    entry->key = uid;
+//    HASH_ADD_INT(bl->uids, key, entry);
+//
+//    bl->stats.num_apps++;
+//    return 0;
+//}
+//hct function modiefied to use mutex for thread safety
 int blacklist_add_uid(blacklist_t *bl, int uid) {
-    if(blacklist_match_uid(bl, uid))
+    // Lock the mutex before accessing the shared blacklist data structure
+    pthread_mutex_lock(&blacklist_mutex);
+
+    if(blacklist_match_uid(bl, uid)) {
+        // Unlock the mutex before returning from the function (early return)
+        pthread_mutex_unlock(&blacklist_mutex);
         return -EADDRINUSE; // duplicate uid
+    }
 
     int_entry_t *entry = bl_malloc(sizeof(int_entry_t));
-    if(!entry)
+    if(!entry) {
+        // Unlock the mutex before returning from the function (early return)
+        pthread_mutex_unlock(&blacklist_mutex);
         return -ENOMEM;
+    }
 
     entry->key = uid;
     HASH_ADD_INT(bl->uids, key, entry);
 
     bl->stats.num_apps++;
+
+    // Unlock the mutex after modifying the blacklist
+    pthread_mutex_unlock(&blacklist_mutex);
+
     return 0;
+}
+
+//hct function added to remove item from blacklist on the fly
+int blacklist_remove_uid(blacklist_t *bl, int uid) {
+    // Lock the mutex before accessing the shared blacklist data structure
+    pthread_mutex_lock(&blacklist_mutex);
+
+    int_entry_t *entry;
+    HASH_FIND_INT(bl->uids, &uid, entry);  // Find the entry with the specified UID
+
+    if (entry) {
+        HASH_DEL(bl->uids, entry);  // Remove the entry from the hash table
+        bl_free(entry);  // Free the memory allocated for the entry
+        bl->stats.num_apps--;  // Decrement the number of apps in the blacklist
+
+        // Unlock the mutex after modifying the blacklist
+        pthread_mutex_unlock(&blacklist_mutex);
+
+        return 0;  // Successfully removed the UID from the blacklist
+    }
+
+    // UID not found in the blacklist
+    // Unlock the mutex before returning from the function
+    pthread_mutex_unlock(&blacklist_mutex);
+
+    return -ENOENT;  // Return error code for "No such file or directory"
 }
 
 /* ******************************************************* */

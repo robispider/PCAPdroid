@@ -36,7 +36,6 @@ extern int nextPacket(pcapdroid_t *pd, pcapd_hdr_t *hdr, char *buf, size_t bufsi
 #define TCP_CLOSED_TIMEOUT_SEC 60   // some servers keep sending FIN+ACK after close
 #define TCP_TIMEOUT_SEC 300         // needs to be large as TCP connections may stay active for a long time
 
-/* ******************************************************* */
 
 typedef struct pcap_conn_t {
     zdtun_5tuple_t tuple;
@@ -44,6 +43,8 @@ typedef struct pcap_conn_t {
 
     UT_hash_handle hh;
 } pcap_conn_t;
+
+
 
 /* ******************************************************* */
 
@@ -392,10 +393,15 @@ static bool handle_packet(pcapdroid_t *pd, pcapd_hdr_t *hdr, const char *buffer,
     zdtun_pkt_t pkt;
     pcap_conn_t *conn = NULL;
     uint8_t is_tx = (hdr->flags & PCAPD_FLAG_TX); // NOTE: the direction uses an heuristic so it may be wrong
-
+    log_d("hct: d zdtun_parse_pkt");
+    log_e("hct: e zdtun_parse_pkt");
     if(zdtun_parse_pkt(pd->zdt, buffer + ipoffset, hdr->len - ipoffset, &pkt) != 0) {
         log_d("zdtun_parse_pkt failed");
         return false;
+    }
+    else
+    {
+        log_d("hct: zdtun_parse_pkt  success");
     }
 
     if(pd->pcap_file_capture && (hdr->uid == UID_UNKNOWN)) {
@@ -498,6 +504,7 @@ static bool handle_packet(pcapdroid_t *pd, pcapd_hdr_t *hdr, const char *buffer,
 
     struct timeval tv = hdr->ts;
     pkt_context_t pinfo;
+
     pd_process_packet(pd, &pkt, is_tx, &conn_tuple, conn->data, &tv, &pinfo);
 
     // NOTE: this may free the conn
@@ -529,7 +536,7 @@ static void purge_expired_connections(pcapdroid_t *pd, uint8_t purge_all) {
 
         if(purge_all || (pd->now_ms >= (conn->data->pcap.last_update_ms + timeout))) {
             //log_d("IDLE (type=%d)", conn->tuple.ipproto);
-
+            removeConnection(conn->data->incr_id);
             conn->data->to_purge = true;
 
             if(conn->data->status < CONN_STATUS_CLOSED) {
@@ -545,6 +552,7 @@ static void purge_expired_connections(pcapdroid_t *pd, uint8_t purge_all) {
             }
 
             remove_connection(pd, conn);
+
         }
     }
 }
@@ -559,7 +567,22 @@ void libpcap_iter_connections(pcapdroid_t *pd, conn_cb cb) {
             return;
     }
 }
+/* *********************************** */
+//hct
+pd_conn_t *find_connection_by_incr_id(pcapdroid_t *pd, jint incr_id) {
+    pcap_conn_t *conn;
 
+    // Iterate through the connections hash table to find the connection with the given incr_id
+    HASH_FIND_INT(pd->pcap.connections, &incr_id, conn);
+
+    if (conn != NULL) {
+        // Connection with given incr_id found, return its data
+        return conn->data;
+    } else {
+        // Connection not found, return NULL or handle it as needed
+        return NULL;
+    }
+}
 /* ******************************************************* */
 
 static void process_pcapd_rv(pcapdroid_t *pd, int rv) {
@@ -598,6 +621,8 @@ int run_libpcap(pcapdroid_t *pd) {
     bool iptables_cleanup = false;
     u_int64_t next_purge_ms;
     zdtun_callbacks_t callbacks = {.send_client = (void*)1};
+
+
 
 #if ANDROID
     char capture_interface[PATH_MAX] = "@inet";

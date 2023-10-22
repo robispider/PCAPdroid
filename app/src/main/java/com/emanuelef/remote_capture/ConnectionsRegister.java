@@ -19,6 +19,8 @@
 
 package com.emanuelef.remote_capture;
 
+import static com.emanuelef.remote_capture.CaptureService.asyncPauseConnection;
+
 import android.content.Context;
 import android.util.SparseArray;
 import android.util.SparseIntArray;
@@ -26,6 +28,7 @@ import android.util.SparseIntArray;
 import androidx.annotation.Nullable;
 import androidx.collection.ArraySet;
 
+import com.emanuelef.remote_capture.dlg.ConnectionAlertDlg;
 import com.emanuelef.remote_capture.interfaces.ConnectionsListener;
 import com.emanuelef.remote_capture.model.AppDescriptor;
 import com.emanuelef.remote_capture.model.AppStats;
@@ -36,8 +39,10 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 /* A container for the connections. This is used to store active/closed connections until the capture
  * is stopped. Active connections are also kept in the native side.
@@ -55,6 +60,11 @@ import java.util.Set;
  */
 public class ConnectionsRegister {
     private static final String TAG = "ConnectionsRegister";
+    public static HashMap<Integer, ConnectionDescriptor> PausedConnectionList;
+
+    //hct modification added two variable
+    private boolean isConnPaused=false;
+    private  boolean isConnBlocked=false;
 
     private final ConnectionDescriptor[] mItemsRing;
     private int mTail;
@@ -81,6 +91,7 @@ public class ConnectionsRegister {
         mAppsStats = new SparseArray<>(); // uid -> AppStats
         mConnsByIface = new SparseIntArray();
         mAppsResolver = new AppsResolver(ctx);
+        PausedConnectionList = new HashMap<>();
     }
 
     // returns the position in mItemsRing of the oldest connection
@@ -95,9 +106,40 @@ public class ConnectionsRegister {
 
     private void processConnectionStatus(ConnectionDescriptor conn, AppStats stats) {
         boolean is_blacklisted = conn.isBlacklisted();
+        //ConnetionRegister.java mathod: processConnectionStatus is modified to check max offset
+        //maleware notificatoin is temporary will be replaced by permission
+        android.util.Log.d("hct connReg.java", "hct processConnectionStatus: Modifications");
+        int MaxTransferOffsetInMb=5;
+
+        if ( conn.payload_length>MaxTransferOffsetInMb*1024*1024)
+        {
+
+            int size= Math.toIntExact(conn.payload_length / (1024 * 1024));
+            android.util.Log.d("hct con_high", "connID: "  +conn.uid+ " payload: " + String.valueOf(size)+" mb ");
+            android.util.Log.d("hct con_high", "pause: "+String.valueOf(isConnPaused)+",  block: "+String.valueOf(isConnBlocked));
+            // conn.is_blocked=true;
+           // CaptureService.pause_connection(conn.incr_id);
+            if (!PausedConnectionList.containsKey(conn.incr_id)) {
+                PausedConnectionList.put(conn.incr_id, conn);
+               // CaptureService.getCaptureService().hashSet.add(conn.incr_id);
+               // CompletableFuture<Void> pauseFuture = asyncPauseConnection(conn.incr_id);
+                // Call the dialog when you need to show it, passing the message as a parameter
+               // String message = "The app is trying to send more than 5 MB from your phone. Click block if you'd like to resume the transfer. You can click block to cancel the transfer.";
+                // ConnectionAlertDlg.showConnectionAlert(this, conn.uid ,message);
+               // CaptureService.requireInstance().notifyPausedConnection(conn, message);
+            }
+
+            if (!isConnPaused)
+                isConnPaused=true;
+            if (!isConnBlocked)
+                isConnBlocked=true;
+
+            //CaptureService.requireInstance().notifyBlacklistedConnection(conn);
+            return;
+        }
 
         if(!conn.alerted && is_blacklisted) {
-            CaptureService.requireInstance().notifyBlacklistedConnection(conn);
+            CaptureService.requireInstance().notifyBlacklistedConnection(conn.uid);
             conn.alerted = true;
             mNumMalicious++;
         } else if(conn.alerted && !is_blacklisted) {
@@ -226,6 +268,7 @@ public class ConnectionsRegister {
                 int pos = ((id - first_id) + first_pos) % mSize;
                 ConnectionDescriptor conn = mItemsRing[pos];
                 assert(conn.incr_id == id);
+
 
                 // update the app stats
                 AppStats stats = getAppsStatsOrCreate(conn.uid);

@@ -99,6 +99,8 @@ public class Prefs {
     public static final String PREF_DNS_SERVER_V6 = "dns_v6";
     public static final String PREF_USE_SYSTEM_DNS = "system_dns";
     public static final String PREF_PCAPNG_ENABLED = "pcapng_format";
+    public static final String PREF_MAX_ALLOWED_SIZE = "max_allowed_bw";
+
 
     public enum DumpMode {
         NONE,
@@ -167,6 +169,9 @@ public class Prefs {
     public static void setPortMappingEnabled(SharedPreferences p, boolean enabled) {
         p.edit().putBoolean(PREF_PORT_MAPPING_ENABLED, enabled).apply();
     }
+    public static void setPrefMaxAllowedSize(SharedPreferences p, float size) {
+        p.edit().putFloat(PREF_MAX_ALLOWED_SIZE, size).apply();
+    }
 
     /* Prefs with defaults */
     public static String getCollectorIp(SharedPreferences p) { return(p.getString(PREF_COLLECTOR_IP_KEY, "127.0.0.1")); }
@@ -214,6 +219,7 @@ public class Prefs {
     public static boolean useSystemDns(SharedPreferences p)     { return(p.getBoolean(PREF_USE_SYSTEM_DNS, true)); }
     public static String getDnsServerV4(SharedPreferences p)    { return(p.getString(PREF_DNS_SERVER_V4, "1.1.1.1")); }
     public static String getDnsServerV6(SharedPreferences p)    { return(p.getString(PREF_DNS_SERVER_V6, "2606:4700:4700::1111")); }
+    public static float getMaxAllowedSizeInMB(SharedPreferences p)    { return(p.getFloat(PREF_MAX_ALLOWED_SIZE, 2.0F)); }
 
     public static String asString(Context ctx) {
         SharedPreferences p = PreferenceManager.getDefaultSharedPreferences(ctx);

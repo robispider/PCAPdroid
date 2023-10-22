@@ -19,6 +19,8 @@
 
 package com.emanuelef.remote_capture;
 
+//import static com.emanuelef.remote_capture.ForegroundService.;
+
 import android.annotation.TargetApi;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -61,6 +63,7 @@ import com.emanuelef.remote_capture.activities.CaptureCtrl;
 import com.emanuelef.remote_capture.activities.ConnectionsActivity;
 import com.emanuelef.remote_capture.activities.FirewallActivity;
 import com.emanuelef.remote_capture.activities.MainActivity;
+import com.emanuelef.remote_capture.dlg.ConnectionAlertDlg;
 import com.emanuelef.remote_capture.fragments.ConnectionsFragment;
 import com.emanuelef.remote_capture.model.AppDescriptor;
 import com.emanuelef.remote_capture.model.BlacklistDescriptor;
@@ -80,6 +83,7 @@ import com.emanuelef.remote_capture.pcap_dump.UDPDumper;
 import com.pcapdroid.mitm.MitmAPI;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
@@ -90,20 +94,27 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class CaptureService extends VpnService implements Runnable {
+public class CaptureService extends VpnService implements Runnable, Serializable {
     private static final String TAG = "CaptureService";
     private static final String VpnSessionName = "PCAPdroid VPN";
     private static final String NOTIFY_CHAN_VPNSERVICE = "VPNService";
     private static final String NOTIFY_CHAN_MALWARE_DETECTION = "Malware detection";
+    private static final String NOTIFY_CHAN_DATA_LEAK_DETECTION = "Data Leak detection";
     private static final String NOTIFY_CHAN_OTHER = "Other";
     private static final int VPN_MTU = 10000;
     public static final int NOTIFY_ID_VPNSERVICE = 1;
     public static final int NOTIFY_ID_LOW_MEMORY = 2;
     public static final int NOTIFY_ID_APP_BLOCKED = 3;
+    public static final int NOTIFY_ID_DATA_LEAK = 4;
+
     private static CaptureService INSTANCE;
     private static boolean HAS_ERROR = false;
     final ReentrantLock mLock = new ReentrantLock();
@@ -188,6 +199,12 @@ public class CaptureService extends VpnService implements Runnable {
             //e.printStackTrace();
         }
     }
+    //hct singeleton pattern
+
+
+    public static CaptureService getCaptureService() {
+        return INSTANCE;
+    }
 
     @Override
     protected void attachBaseContext(Context base) {
@@ -202,6 +219,7 @@ public class CaptureService extends VpnService implements Runnable {
         mSettings = new CaptureSettings(this, mPrefs); // initialize to prevent NULL pointer exceptions in methods (e.g. isRootCapture)
 
         INSTANCE = this;
+        //captureServiceObj=this;
         super.onCreate();
     }
 
@@ -506,6 +524,7 @@ public class CaptureService extends VpnService implements Runnable {
         checkBlacklistsUpdates(true);
 
         mBlocklist = PCAPdroid.getInstance().getBlocklist();
+
         mFirewallWhitelist = PCAPdroid.getInstance().getFirewallWhitelist();
 
         mConnUpdateThread = new Thread(this::connUpdateWork, "UpdateListener");
@@ -629,6 +648,11 @@ public class CaptureService extends VpnService implements Runnable {
                     getString(R.string.malware_detection), NotificationManager.IMPORTANCE_HIGH);
             nm.createNotificationChannel(chan);
 
+            // Data Leak connection notification channel
+            chan = new NotificationChannel(NOTIFY_CHAN_DATA_LEAK_DETECTION,
+                    getString(R.string.malware_detection), NotificationManager.IMPORTANCE_HIGH);
+            nm.createNotificationChannel(chan);
+
             // Other notifications
             chan = new NotificationChannel(NOTIFY_CHAN_OTHER,
                     getString(R.string.other_prefs), NotificationManager.IMPORTANCE_DEFAULT);
@@ -674,30 +698,111 @@ public class CaptureService extends VpnService implements Runnable {
         Notification notification = getStatusNotification();
         NotificationManagerCompat.from(this).notify(NOTIFY_ID_VPNSERVICE, notification);
     }
+//hct
+public  Set<Integer> hashSet = ConcurrentHashMap.newKeySet();
+    // Native method declaration
+    public   boolean isConnectionBlockExist(int element)
+    {
+        if (hashSet==null)
+            return  false;
+        android.util.Log.d("hct con_block_J", "isConnectionBlockExist: "+String.valueOf(element));
+        try {
+            if (this.hashSet.size()>0)
+            {
+                boolean val= hashSet.contains(element);
+                android.util.Log.d("hct con_block_J", "isConnectionBlockExist: "+String.valueOf(this.hashSet.size())+", ret: "+String.valueOf(val));
+                return  val;
+            }
+            else
+            {
+                return  false;
+            }
 
-    public void notifyBlacklistedConnection(ConnectionDescriptor conn) {
-        int uid = conn.uid;
+
+        }
+        catch ( Exception exception    )
+        {
+            return false;
+        }
+        //return  false;
+    }
+    public void jnotifyPausedConnection(int conn_id, int appid, float mb ) {
+        android.util.Log.d("hct con_notify_j", "jnotifyPausedConnection: "+String.valueOf(conn_id));
+
+        // Create an intent with action "ACTION_NOTIFY_PAUSED_CONNECTION"
+        Intent intent = new Intent("ACTION_NOTIFY_PAUSED_CONNECTION");
+        intent.putExtra("target_appid", appid);
+        intent.putExtra("conn_id", conn_id );
+        intent.putExtra("data_size",mb);
+
+        intent.putExtra("message", "This app is trying to transfer beyond your limit of data transfer");
+        // intent.putExtra("capture_service", this);
+        // Set the intent flags to bring the application to the foreground and clear all other activities
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+
+        // Send the broadcast
+        sendBroadcast(intent);
+        notifyBlacklistedConnection(appid);
+    }
+//    public void jnotifyPausedConnection(int conn_id, int appid, float mb) {
+//        android.util.Log.d("hct con_notify_j", "jnotifyPausedConnection: " + String.valueOf(conn_id));
+//
+//        // Create an intent with action "ACTION_NOTIFY_PAUSED_CONNECTION"
+//        Intent intent = new Intent("ACTION_NOTIFY_PAUSED_CONNECTION");
+//        intent.putExtra("target_appid", appid);
+//        intent.putExtra("conn_id", conn_id);
+//        intent.putExtra("data_size", mb);
+//        intent.putExtra("message", "This app is trying to transfer beyond your limit of data transfer");
+//
+//        // Create a PendingIntent to bring the app to the foreground when the notification is clicked
+//
+//        PendingIntent pi = PendingIntent.getActivity(CaptureService.this, 0,
+//                intent, Utils.getIntentFlags(0));
+//
+//        PendingIntent unblockIntent = PendingIntent.getBroadcast(CaptureService.this, 0,
+//                new Intent(CaptureService.this, MainActivity.class)
+//                , Utils.getIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT));
+//
+//        // Create a notification using NotificationCompat.Builder
+//        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NOTIFY_CHAN_DATA_LEAK_DETECTION)
+//                .setSmallIcon(R.drawable.ic_logo)
+//                .setContentTitle("Paused Connection")
+//                .setContentText("This app is trying to transfer beyond your limit of data transfer")
+//                .setPriority(NotificationCompat.PRIORITY_HIGH)
+//                .setContentIntent(pi) // Set the PendingIntent to bring the app to the foreground
+//                .setAutoCancel(false);
+//             //   .addAction(); // Do not dismiss the notification automatically
+//
+//        // Send the notification using NotificationManagerCompat
+//        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
+//        notificationManager.notify(NOTIFY_ID_DATA_LEAK, builder.build());
+//    }
+
+
+    public void notifyBlacklistedConnection(int uid) {
+
 
         AppsResolver resolver = new AppsResolver(this);
-        AppDescriptor app = resolver.getAppByUid(conn.uid, 0);
+        AppDescriptor app = resolver.getAppByUid(uid, 0);
         if(app == null)
             return;
 
         FilterDescriptor filter = new FilterDescriptor();
         filter.onlyBlacklisted = true;
 
-        Intent intent = new Intent(this, ConnectionsActivity.class)
+        Intent intent = new Intent(this, MainActivity.class)
                 .putExtra(ConnectionsFragment.FILTER_EXTRA, filter)
                 .putExtra(ConnectionsFragment.QUERY_EXTRA, app.getPackageName());
         PendingIntent pi = PendingIntent.getActivity(this, 0,
                 intent, Utils.getIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT));
 
         String rule_label;
-        if(conn.isBlacklistedHost())
-            rule_label = MatchList.getRuleLabel(this, MatchList.RuleType.HOST, conn.info);
-        else
-            rule_label = MatchList.getRuleLabel(this, MatchList.RuleType.IP, conn.dst_ip);
-
+       // if(conn.isBlacklistedHost())
+      //      rule_label = MatchList.getRuleLabel(this, MatchList.RuleType.HOST, conn.info);
+      //  else
+        //    rule_label = MatchList.getRuleLabel(this, MatchList.RuleType.IP, conn.dst_ip);
+        rule_label="Leak Detected";
         mMalwareBuilder
                 .setContentIntent(pi)
                 .setWhen(System.currentTimeMillis())
@@ -1045,6 +1150,8 @@ public class CaptureService extends VpnService implements Runnable {
     public static void requestBlacklistsUpdate() {
         if(INSTANCE != null) {
             INSTANCE.mBlacklistsUpdateRequested = true;
+            //hct use this strategy to block the connection on the fly
+
 
             // Wake the update thread to run the blacklist thread
             INSTANCE.mPendingUpdates.offer(new Pair<>(new ConnectionDescriptor[0], new ConnectionUpdate[0]));
@@ -1077,6 +1184,7 @@ public class CaptureService extends VpnService implements Runnable {
 
                 if((fd > 0) && (fd < fd_setsize)) {
                     Log.d(TAG, "VPN fd: " + fd + " - FD_SETSIZE: " + fd_setsize);
+                    //native mathod starts capture star
                     runPacketLoop(fd, this, Build.VERSION.SDK_INT);
 
                     // if always-on VPN is stopped, it's not an always-on anymore
@@ -1311,7 +1419,10 @@ public class CaptureService extends VpnService implements Runnable {
     }
 
     public String getPcapDumperBpf() { return((mDumper != null) ? mDumper.getBpf() : ""); }
-
+public  float getMaxAllowedSize()
+{
+    return Prefs.getMaxAllowedSizeInMB(mPrefs);
+}
     @Override
     public boolean protect(int socket) {
         // Do not call protect in root mode
@@ -1354,7 +1465,7 @@ public class CaptureService extends VpnService implements Runnable {
 
     // called from native
     public void sendStatsDump(CaptureStats stats) {
-        //Log.d(TAG, "sendStatsDump");
+        Log.d("hct", "hct sendStatsDump");
 
         last_bytes = stats.bytes_sent + stats.bytes_rcvd;
         last_connections = stats.tot_conns;
@@ -1567,8 +1678,47 @@ public class CaptureService extends VpnService implements Runnable {
     private static native void setPrivateDnsBlocked(boolean to_block);
     private static native void setDnsServer(String server);
     private static native void addPortMapping(int ipproto, int orig_port, int redirect_port, String redirect_ip);
+    //hct bewlow two mathod reloads the blocklist in native code
     private static native void reloadBlacklists();
     private static native boolean reloadBlocklist(MatchList.ListDescriptor blocklist);
+
+    //reloadBlocklist
+//hct added new function
+    public static native boolean addToBlocklist(MatchList.ListDescriptor blocklist, int block_uid);
+    public static native boolean removeFromBlocklist(MatchList.ListDescriptor blocklist, int block_uid);
+    // Native methods to pause and resume a connection
+    public static native void pause_connection(int connId);
+    public static native void resume_connection(int connId);
+    public static native void blockConnection(int connId);
+    public static CompletableFuture<Void> asyncPauseConnection(int connId) {
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+            // Call native function asynchronously
+            pause_connection(connId);
+        }, executorService);
+
+        // Shutdown the executor service when the CompletableFuture completes
+        future.thenRun(executorService::shutdown);
+
+        return future;
+    }
+
+    public static CompletableFuture<Void> asyncResumeConnection(int connId) {
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+            // Call native function asynchronously
+            resume_connection(connId);
+        }, executorService);
+
+        // Shutdown the executor service when the CompletableFuture completes
+        future.thenRun(executorService::shutdown);
+
+        return future;
+    }
+   // CompletableFuture<Void> pauseFuture = asyncPauseConnection(connId);
+   // CompletableFuture<Void> resumeFuture = asyncResumeConnection(connId);
+
+    /* *******************************  */
     private static native boolean reloadFirewallWhitelist(MatchList.ListDescriptor whitelist);
     private static native boolean reloadMalwareWhitelist(MatchList.ListDescriptor whitelist);
     private static native boolean reloadDecryptionList(MatchList.ListDescriptor whitelist);

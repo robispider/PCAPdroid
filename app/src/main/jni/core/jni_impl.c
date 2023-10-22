@@ -162,6 +162,10 @@ static jobject getConnUpdate(pcapdroid_t *pd, const conn_and_tuple_t *conn) {
     }
 
     if(data->update_type & CONN_UPDATE_STATS) {
+        if (data->to_block)
+        {
+            int i=0;//just test
+        }
         bool blocked = data->to_block && pd->vpn_capture; // currently can only block connections in non-root mode
 
         (*env)->CallVoidMethod(env, update, mids.connUpdateSetStats, data->last_seen,
@@ -505,6 +509,7 @@ static void init_jni(JNIEnv *env) {
     // NOTE: these are bound to this specific env
 
     /* Classes */
+   // cls.capture_service=jniFindClass(env, "com/emanuelef/remote_capture/CaptureService");
     cls.vpn_service = jniFindClass(env, "com/emanuelef/remote_capture/CaptureService");
     cls.conn = jniFindClass(env, "com/emanuelef/remote_capture/model/ConnectionDescriptor");
     cls.conn_update = jniFindClass(env, "com/emanuelef/remote_capture/model/ConnectionUpdate");
@@ -517,6 +522,10 @@ static void init_jni(JNIEnv *env) {
     cls.payload_chunk = jniFindClass(env, "com/emanuelef/remote_capture/model/PayloadChunk");
 
     /* Methods */
+    //hct
+
+    mids.jnotifyPausedConnection=jniGetMethodID(env, cls.vpn_service, "jnotifyPausedConnection", "(IIF)V");
+    mids.isConnectionBlockExist=jniGetMethodID(env, cls.vpn_service, "isConnectionBlockExist", "(I)Z");
     mids.reportError = jniGetMethodID(env, cls.vpn_service, "reportError", "(Ljava/lang/String;)V");
     mids.getApplicationByUid = jniGetMethodID(env, cls.vpn_service, "getApplicationByUid", "(I)Ljava/lang/String;"),
             mids.protect = jniGetMethodID(env, cls.vpn_service, "protect", "(I)Z");
@@ -603,11 +612,15 @@ Java_com_emanuelef_remote_1capture_CaptureService_runPacketLoop(JNIEnv *env, jcl
                     .proxy_port = htons(getIntPref(env, vpn, "getSocks5ProxyPort")),
             },
             .malware_detection = {
-                    .enabled = (bool) getIntPref(env, vpn, "malwareDetectionEnabled"),
-            },
+                    //hct enabled the malware_detaction by defult
+                    //.enabled = (bool) getIntPref(env, vpn, "malwareDetectionEnabled"),
+                    .enabled=true
+                    },
             .firewall = {
-                    .enabled = (bool) getIntPref(env, vpn, "firewallEnabled"),
-            },
+                    //hct enabled the firewall by defult
+                    //.enabled = (bool) getIntPref(env, vpn, "firewallEnabled"),
+                    .enabled=true
+                    },
             .tls_decryption = {
                     .enabled = (bool) getIntPref(env, vpn, "isTlsDecryptionEnabled"),
             }
@@ -632,8 +645,13 @@ Java_com_emanuelef_remote_1capture_CaptureService_runPacketLoop(JNIEnv *env, jcl
     logcallback = log_callback;
     signal(SIGPIPE, SIG_IGN);
 
-    // Run the capture
+
+
+
+// Run the capture
+     //hct
     pd_run(&pd);
+    log_e("run the capture with pd{s}",&pd);
 
     global_pd = NULL;
     logcallback = NULL;
@@ -835,7 +853,82 @@ Java_com_emanuelef_remote_1capture_CaptureService_reloadBlocklist(JNIEnv *env, j
     pd->firewall.new_bl = bl;
     return true;
 }
+//hct directly add to malewere list for blocking
+JNIEXPORT jboolean JNICALL
+Java_com_emanuelef_remote_1capture_CaptureService_addToBlocklist(JNIEnv *env, jclass clazz,
+                                                                 jobject ld, jint block_uid) {
+    pcapdroid_t *pd = global_pd;
+    if(!pd) {
+        log_e("NULL pd instance");
+        return JNI_FALSE;
+    }
 
+    if(!pd->vpn_capture) {
+        log_e("firewall in root mode not implemented");
+        return JNI_FALSE;
+    }
+
+    if(pd->malware_detection.bl == NULL) {
+        log_e("previous blocklist not loaded yet");
+        return JNI_FALSE;
+    }
+
+    // Add block_uid to the blocklist
+    blacklist_add_uid(pd->malware_detection.bl, block_uid);
+
+    return JNI_TRUE;
+}
+//hct
+JNIEXPORT jboolean JNICALL
+Java_com_emanuelef_remote_1capture_CaptureService_removeFromBlocklist(JNIEnv *env, jclass clazz,
+                                                                      jobject ld, jint block_uid) {
+    pcapdroid_t *pd = global_pd;
+    if(!pd) {
+        log_e("NULL pd instance");
+        return JNI_FALSE;
+    }
+
+    if(!pd->vpn_capture) {
+        log_e("firewall in root mode not implemented");
+        return JNI_FALSE;
+    }
+
+    if(pd->malware_detection.bl == NULL) {
+        log_e("blocklist not loaded yet");
+        return JNI_FALSE;
+    }
+
+    // Remove block_uid from the blocklist
+    int result = blacklist_remove_uid(pd->malware_detection.bl, block_uid);
+
+    // Check if UID was successfully removed
+    if (result == 0) {
+        return JNI_TRUE;  // Successfully removed from the blocklist
+    } else if (result == -ENOENT) {
+        log_w("UID %d not found in the blocklist", block_uid);
+        return JNI_FALSE;  // UID not found in the blocklist
+    } else {
+        log_e("Error removing UID %d from the blocklist", block_uid);
+        return JNI_FALSE;  // Error removing UID from the blocklist
+    }
+}
+/* hct JNIEXPORT method to pause a connection */
+JNIEXPORT void JNICALL
+Java_com_emanuelef_remote_1capture_CaptureService_pause_1connection(JNIEnv *env, jclass clazz, jint conn_id) {
+    pause_a_conn(conn_id);
+}
+
+/* hct JNIEXPORT method to resume a connection */
+JNIEXPORT void JNICALL
+Java_com_emanuelef_remote_1capture_CaptureService_resume_1connection(JNIEnv *env, jclass clazz, jint conn_id) {
+    resume_a_conn(conn_id);
+}
+JNIEXPORT void JNICALL
+Java_com_emanuelef_remote_1capture_CaptureService_blockConnection(JNIEnv *env, jclass clazz, jint conn_id) {
+    block_a_connection(conn_id);
+}
+
+//blacklist_add_uid(bl,10224);
 /* ******************************************************* */
 
 JNIEXPORT jboolean JNICALL
@@ -1209,7 +1302,18 @@ int getIntPref(JNIEnv *env, jobject vpn_inst, const char *key) {
 
     return(value);
 }
+//hct
+float getFloatPref(JNIEnv *env, jobject vpn_inst, const char *key) {
+    jfloat value;
+    jmethodID midMethod = jniGetMethodID(env, cls.vpn_service, key, "()F");
 
+    value = (*env)->CallFloatMethod(env, vpn_inst, midMethod);
+    jniCheckException(env);
+
+    log_d("getFloatPref(%s) = %f", key, value);
+
+    return (float)value;
+}
 /* ******************************************************* */
 
 void getApplicationByUid(pcapdroid_t *pd, jint uid, char *buf, int bufsize) {
@@ -1255,5 +1359,23 @@ Java_com_emanuelef_remote_1capture_CaptureService_hasSeenPcapdroidTrailer(JNIEnv
                                                                           jclass clazz) {
     return has_seen_pcapdroid_trailer;
 }
+//hct
+//JNIEXPORT jboolean JNICALL
+//Java_com_emanuelef_remote_1capture_CaptureService_isConnectionExist(JNIEnv *env, jobject instance,
+//                                                                    jint element) {
+//
+//    jclass clazz = (*env)->FindClass(*env,"com/emanuelef/remote_capture/CaptureService");
+//    jmethodID methodId = (*env)->GetMethodID(*env, clazz, "isConnectionExist", "(I)Z");
+//
+//    if (methodId != NULL) {
+//        return (*env)->CallBooleanMethod(env, instance, methodId, element);
+//    }
+//
+//    // Handle method not found error (return false by default)
+//    return JNI_FALSE;
+//}
+
+
 
 #endif // ANDROID
+

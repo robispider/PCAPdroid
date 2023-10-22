@@ -313,6 +313,7 @@ public class MitmReceiver implements Runnable, ConnectionsListener, MitmListener
     }
 
     private void handleMessage(ConnectionDescriptor conn, MsgType type, byte[] message, long tstamp) {
+        android.util.Log.d(TAG+" hct: ", new String(message, StandardCharsets.US_ASCII) );
         // NOTE: we are possibly accessing the conn concurrently
         if((type == MsgType.TLS_ERROR) || (type == MsgType.HTTP_ERROR) || (type == MsgType.TCP_ERROR)) {
             conn.decryption_error = new String(message, StandardCharsets.US_ASCII);

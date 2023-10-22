@@ -71,6 +71,9 @@ int blacklist_add_domain(blacklist_t *bl, const char *domain);
 int blacklist_add_ip(blacklist_t *bl, const ndpi_ip_addr_t *addr, uint8_t ipver);
 int blacklist_add_ipstr(blacklist_t *bl, const char *ip);
 int blacklist_add_uid(blacklist_t *bl, int uid);
+//hct function added
+int blacklist_remove_uid(blacklist_t *bl, int uid);
+
 int blacklist_load_file(blacklist_t *bl, const char *path, blacklist_type btype, blacklist_stats_t *bstats);
 #ifdef ANDROID
 int blacklist_load_list_descriptor(blacklist_t *bl, JNIEnv *env, jobject ld);

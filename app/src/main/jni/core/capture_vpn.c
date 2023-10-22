@@ -447,6 +447,8 @@ int run_vpn(pcapdroid_t *pd) {
 
     pd->vpn.ipv6.enabled = (bool) getIntPref(pd->env, pd->capture_service, "getIPv6Enabled");
     pd->vpn.ipv6.dns_server = getIPv6Pref(pd->env, pd->capture_service, "getIpv6DnsServer");
+    //hct
+    pd->max_payload_length=getFloatPref(pd->env, pd->capture_service,"getMaxAllowedSize");
 #endif
 
     zdtun_callbacks_t callbacks = {
@@ -509,6 +511,12 @@ int run_vpn(pcapdroid_t *pd) {
         if(FD_ISSET(pd->vpn.tunfd, &fdset)) {
             /* Packet from VPN */
             size = read(pd->vpn.tunfd, buffer, sizeof(buffer));
+            // Check if the size of the packet exceeds 5MB (5 * 1024 * 1024 bytes)
+            if (size > 5 * 1024 * 1024) {
+                log_d("Packet size exceeds 5MB. Dropping the packet.");
+                continue; // Skip processing and move to the next iteration of the loop
+            }
+
             if(size > 0) {
                 zdtun_pkt_t pkt;
                 pd_refresh_time(pd);
@@ -576,7 +584,7 @@ int run_vpn(pcapdroid_t *pd) {
                         data->proxied = true;
                     }
                 }
-
+                //hct info
                 pd_process_packet(pd, &pkt, true, tuple, data, get_pkt_timestamp(pd, &tv), &pctx);
                 if(data->sent_pkts == 0) {
                     // Newly created connections
