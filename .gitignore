@@ -2,7 +2,7 @@
 
 # Generated files
 .idea/
-.gradle
+.Gradle
 
 # Gradle and Maven with auto-import
 *.iml

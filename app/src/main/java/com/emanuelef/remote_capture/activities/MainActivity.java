@@ -267,7 +267,9 @@ private  BroadcastReceiver receiver;
     protected void onDestroy() {
         super.onDestroy();
         // Unregister the broadcast receiver
-        unregisterReceiver(receiver);
+        if (receiver!=null) {
+            unregisterReceiver(receiver);
+        }
         if(!CaptureService.isServiceActive()) {
             boolean ignored = getTmpPcapPath().delete();
         }
