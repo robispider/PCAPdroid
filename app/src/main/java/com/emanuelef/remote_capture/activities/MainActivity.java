@@ -213,19 +213,19 @@ private  BroadcastReceiver receiver;
 
 
             //hct Check if the intent has the ACTION_NOTIFY_PAUSED_CONNECTION action
-            if (getIntent() != null && "ACTION_NOTIFY_PAUSED_CONNECTION".equals(getIntent().getAction())) {
-                // Bring the application to the foreground
-                Intent foregroundIntent = new Intent(this, MainActivity.class);
-                foregroundIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                startActivity(foregroundIntent);
-
-                // Handle the notification data (if needed)
-                int targetAppId = getIntent().getIntExtra("target_appid", 0);
-                int connId = getIntent().getIntExtra("conn_id", -1);
-                float dataSize = getIntent().getFloatExtra("data_size", 0.0f);
-                String message = getIntent().getStringExtra("message");
-                // Handle the data as needed
-            }
+//            if (getIntent() != null && "ACTION_NOTIFY_PAUSED_CONNECTION".equals(getIntent().getAction())) {
+//                // Bring the application to the foreground
+//                Intent foregroundIntent = new Intent(this, MainActivity.class);
+//                foregroundIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+//                startActivity(foregroundIntent);
+//
+//                // Handle the notification data (if needed)
+//                int targetAppId = getIntent().getIntExtra("target_appid", 0);
+//                int connId = getIntent().getIntExtra("conn_id", -1);
+//                float dataSize = getIntent().getFloatExtra("data_size", 0.0f);
+//                String message = getIntent().getStringExtra("message");
+//                // Handle the data as needed
+//            }
 
 
         // Register a broadcast receiver to receive the broadcast
@@ -303,6 +303,7 @@ private  BroadcastReceiver receiver;
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(this, mDrawer, toolbar, R.string.open_nav_drawer, R.string.close_nav_drawer);
         mDrawer.addDrawerListener(toggle);
         toggle.syncState();
+
 
         mNavView = findViewById(R.id.nav_view);
         mNavView.setNavigationItemSelectedListener(this);
@@ -771,7 +772,7 @@ private  BroadcastReceiver receiver;
 //        serviceIntent.putExtra("inputExtra", userInput);
 //        ContextCompat.startForegroundService(MainActivity.this, serviceIntent);
     }
-
+//hct start capture mathod
     public void startCapture() {
         if(showRemoteServerAlert())
             return;

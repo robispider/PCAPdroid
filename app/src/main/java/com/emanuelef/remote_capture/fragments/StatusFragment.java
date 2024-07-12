@@ -474,7 +474,7 @@ public class StatusFragment extends Fragment implements AppStateListener, MenuPr
         }
 
         builder.setView(input);
-
+//hct
         builder.setPositiveButton("Save", new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialogInterface, int i) {
